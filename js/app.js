@@ -48,6 +48,29 @@
     registrarEventos();
     actualizarEstadoModoInstructorUI();
     refrescarVistasDatos();
+    autoSincronizarPendientesAlIniciar();
+  }
+
+  async function autoSincronizarPendientesAlIniciar() {
+    const scriptUrl = obtenerScriptUrl();
+    if (!scriptUrl) return;
+    const pendientes = obtenerRegistrosLocales().filter(r => !r.synced);
+    if (pendientes.length === 0) return;
+
+    try {
+      const resp = await enviarRegistrosAGoogleDrive(scriptUrl, pendientes);
+      if (resp && resp.ok) {
+        marcarRegistrosSincronizados(pendientes.map(p => p.id));
+        actualizarEstadoModoInstructorUI();
+        refrescarVistasDatos();
+        mostrarAlerta(
+          'success',
+          `<i class="bi bi-check-circle-fill me-1"></i>¡Listo! Se envió automáticamente ${pendientes.length === 1 ? 'tu calificación pendiente' : `tus ${pendientes.length} calificaciones pendientes`} al registro del instructor.`
+        );
+      }
+    } catch (_) {
+      // Se reintentará en el próximo envío o recarga
+    }
   }
 
   function cacheDom() {
