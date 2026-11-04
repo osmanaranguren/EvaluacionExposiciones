@@ -1,0 +1,267 @@
+:root {
+  --sena-green: #39A900;
+  --sena-green-dark: #2c8300;
+  --sena-green-soft: #eef8e8;
+  --sena-navy: #00324D;
+  --sena-navy-light: #0a4b6e;
+  --sena-orange: #FF6B00;
+  --sena-orange-soft: #fff3ea;
+  --bg-page: #f4f7f9;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: #1e293b;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Header Institucional SENA */
+.sena-header {
+  background: linear-gradient(135deg, var(--sena-navy) 0%, #064669 65%, #126139 100%);
+  border-bottom: 4px solid var(--sena-orange);
+  color: #ffffff;
+}
+
+.sena-badge-pill {
+  background-color: rgba(57, 169, 0, 0.22);
+  border: 1px solid rgba(132, 235, 77, 0.45);
+  color: #d9ffd0;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Navegación principal */
+.nav-pills .nav-link {
+  color: var(--sena-navy);
+  font-weight: 600;
+  border-radius: 0.6rem;
+  padding: 0.6rem 1.1rem;
+  transition: all 0.18s ease;
+}
+
+.nav-pills .nav-link:hover {
+  background-color: #e6eef3;
+}
+
+.nav-pills .nav-link.active {
+  background-color: var(--sena-green);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(57, 169, 0, 0.28);
+}
+
+/* Tarjetas */
+.card-sena {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  background: #ffffff;
+}
+
+.card-sena-header {
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-top-left-radius: 0.85rem !important;
+  border-top-right-radius: 0.85rem !important;
+  font-weight: 700;
+  color: var(--sena-navy);
+}
+
+.card-especial {
+  border: 2px solid #f59e0b;
+  background-color: #fffdf7;
+}
+
+.card-especial .card-sena-header {
+  background-color: var(--sena-orange-soft);
+  color: #9a3412;
+  border-bottom-color: #fed7aa;
+}
+
+/* Ítems de evaluación */
+.eval-item-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.eval-item-row:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.eval-item-row.graded-aprobado {
+  border-left: 5px solid var(--sena-green);
+  background-color: #fcfefb;
+}
+
+.eval-item-row.graded-deficiente {
+  border-left: 5px solid #dc3545;
+  background-color: #fffafa;
+}
+
+.eval-item-row.ungraded {
+  border-left: 5px solid #cbd5e1;
+}
+
+.score-preset-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  font-weight: 600;
+}
+
+.score-input-num {
+  width: 78px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.form-range.sena-range::-webkit-slider-thumb {
+  background: var(--sena-green);
+}
+.form-range.sena-range::-moz-range-thumb {
+  background: var(--sena-green);
+}
+
+/* Panel lateral sticky (Cronómetro + Resumen de Nota) */
+.sticky-sidebar {
+  position: sticky;
+  top: 1rem;
+}
+
+.timer-display {
+  font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
+  font-size: 2.35rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1.1;
+}
+
+.stage-btn {
+  text-align: left;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  transition: all 0.15s ease;
+}
+
+.stage-btn.active {
+  background-color: var(--sena-navy);
+  color: #ffffff;
+  border-color: var(--sena-navy);
+}
+
+.stage-btn.completed {
+  background-color: var(--sena-green-soft);
+  border-color: #a3e635;
+  color: #166534;
+}
+
+/* Indicador de nota final */
+.final-score-box {
+  border-radius: 0.8rem;
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.final-score-box.aprobado {
+  background: linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%);
+  border: 2px solid var(--sena-green);
+  color: #14532d;
+}
+
+.final-score-box.deficiente {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 2px solid #ef4444;
+  color: #7f1d1d;
+}
+
+.final-score-box.pendiente {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  color: #475569;
+}
+
+.final-score-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Botón institucional verde SENA */
+.btn-sena {
+  background-color: var(--sena-green);
+  border-color: var(--sena-green);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-sena:hover,
+.btn-sena:focus {
+  background-color: var(--sena-green-dark);
+  border-color: var(--sena-green-dark);
+  color: #ffffff;
+}
+
+.btn-navy {
+  background-color: var(--sena-navy);
+  border-color: var(--sena-navy);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-navy:hover,
+.btn-navy:focus {
+  background-color: var(--sena-navy-light);
+  border-color: var(--sena-navy-light);
+  color: #ffffff;
+}
+
+/* Bloque de código Apps Script */
+.code-viewer {
+  max-height: 360px;
+  overflow-y: auto;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.8rem;
+  border-radius: 0.6rem;
+  padding: 1rem;
+  white-space: pre;
+}
+
+/* Área exclusiva de impresión / exportación PDF */
+#printReportArea {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  #printReportArea {
+    display: block !important;
+  }
+  .print-table th,
+  .print-table td {
+    border: 1px solid #334155 !important;
+    padding: 6px 8px !important;
+    font-size: 11pt !important;
+  }
+  .print-header-bar {
+    border-bottom: 3px solid #39A900 !important;
+    margin-bottom: 14px !important;
+    padding-bottom: 8px !important;
+  }
+}
+
