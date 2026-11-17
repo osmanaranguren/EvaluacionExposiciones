@@ -7,6 +7,8 @@
 window.ADSO_CONFIG = {
   // Pegue aquí la URL /exec de su Google Apps Script para que todos los aprendices envíen directo a su Google Sheet sin configurar nada:
   scriptUrlFija: 'https://script.google.com/macros/s/AKfycbyClhaP_jBJ1w5mxSK4pONhKCY9p0fyLJciNX29j8IXMsFvtPXhoIBPty8h_c3obY0r/exec',
+  spreadsheetUrlDefault: 'https://docs.google.com/spreadsheets/d/1hrr-fU02hmKoPQnRgkbOMrkMXXWEK3h5YqPK3B3Eie4/edit',
+  spreadsheetNameDefault: 'Registro_Evaluaciones_Exposiciones_ADSO',
   programa: 'Análisis y Desarrollo de Software (ADSO)',
   centro: 'SENA — CIMM Regional Boyacá',
   fichaDefault: '3232460',

@@ -1826,10 +1826,17 @@
   function obtenerMetaSheet() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SHEET_META);
-      return raw ? JSON.parse(raw) : null;
+      if (raw) return JSON.parse(raw);
     } catch (_) {
-      return null;
+      // ignorar
     }
+    if (window.ADSO_CONFIG.spreadsheetUrlDefault) {
+      return {
+        url: window.ADSO_CONFIG.spreadsheetUrlDefault,
+        name: window.ADSO_CONFIG.spreadsheetNameDefault || 'Registro_Evaluaciones_Exposiciones_ADSO'
+      };
+    }
+    return null;
   }
 
   function obtenerRegistrosLocales() {
