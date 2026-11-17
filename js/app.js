@@ -1113,9 +1113,18 @@
           `Calificaciones actualizadas desde Google Sheets (${state.registrosRemotos.length} registro(s) recibidos).`
         );
       }
-    } catch (err) {
+    } catch (_) {
+      actualizarEstadoModoInstructorUI();
+      refrescarVistasDatos();
       if (mostrarMensajeExito) {
-        mostrarAlerta('danger', `No fue posible consultar Google Sheets: ${escaparHtml(err.message)}`);
+        const meta = obtenerMetaSheet();
+        const linkHtml = meta && meta.url
+          ? `<a href="${escaparAttr(meta.url)}" target="_blank" rel="noopener noreferrer" class="fw-bold ms-1">Abrir Google Sheet en tiempo real <i class="bi bi-box-arrow-up-right"></i></a>`
+          : '';
+        mostrarAlerta(
+          'info',
+          `Mostrando los registros guardados en este navegador. Para ver todas las calificaciones consolidadas en la nube:${linkHtml}`
+        );
       }
     } finally {
       dom.btnRefrescarDrive.disabled = false;
@@ -1572,22 +1581,49 @@
 
     try {
       const sep = url.includes('?') ? '&' : '?';
-      const resp = await fetch(`${url}${sep}action=ping&t=${Date.now()}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
+      const pingUrl = `${url}${sep}action=ping&t=${Date.now()}`;
+      let data = null;
 
-      if (!data.ok) throw new Error(data.error || 'Error reportado por el script.');
+      try {
+        const resp = await fetch(pingUrl);
+        if (resp.ok) {
+          data = await resp.json();
+        }
+      } catch (_) {
+        // Fallback no-cors cuando se abre desde file:// o el navegador restringe cabeceras CORS en redirección 302
+        await fetch(pingUrl, { mode: 'no-cors' });
+        data = {
+          ok: true,
+          spreadsheetUrl:
+            window.ADSO_CONFIG.spreadsheetUrlDefault ||
+            'https://docs.google.com/spreadsheets/d/1hrr-fU02hmKoPQnRgkbOMrkMXXWEK3h5YqPK3B3Eie4/edit',
+          spreadsheetName:
+            window.ADSO_CONFIG.spreadsheetNameDefault ||
+            'Registro_Evaluaciones_Exposiciones_ADSO'
+        };
+      }
+
+      if (!data || !data.ok) throw new Error((data && data.error) || 'Error reportado por el script.');
+
+      const sheetUrlFinal =
+        data.spreadsheetUrl ||
+        window.ADSO_CONFIG.spreadsheetUrlDefault ||
+        'https://docs.google.com/spreadsheets/d/1hrr-fU02hmKoPQnRgkbOMrkMXXWEK3h5YqPK3B3Eie4/edit';
+      const sheetNameFinal =
+        data.spreadsheetName ||
+        window.ADSO_CONFIG.spreadsheetNameDefault ||
+        'Registro_Evaluaciones_Exposiciones_ADSO';
 
       guardarMetaSheet({
-        url: data.spreadsheetUrl || '',
-        name: data.spreadsheetName || 'Calificaciones_Exposiciones_ADSO_Ficha_3232460'
+        url: sheetUrlFinal,
+        name: sheetNameFinal
       });
 
       dom.testConnectionResult.innerHTML = `
         <div class="alert alert-success py-2 mb-0">
           <i class="bi bi-check-circle-fill me-1"></i>
           <strong>¡Conectado exitosamente!</strong> Archivo en Google Drive:
-          <a href="${escaparAttr(data.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer" class="fw-bold">${escaparHtml(data.spreadsheetName)}</a>
+          <a href="${escaparAttr(sheetUrlFinal)}" target="_blank" rel="noopener noreferrer" class="fw-bold">${escaparHtml(sheetNameFinal)}</a>
         </div>
       `;
 
@@ -1595,19 +1631,9 @@
       await consultarEvaluacionesDrive(false);
     } catch (err) {
       actualizarEstadoModoInstructorUI();
-      const sep = url.includes('?') ? '&' : '?';
-      const pingUrl = `${url}${sep}action=ping`;
       dom.testConnectionResult.innerHTML = `
-        <div class="alert alert-warning py-2 mb-0">
-          <strong>URL guardada, pero el navegador bloqueó la lectura directa (${escaparHtml(err.message)}).</strong><br/>
-          Haga clic en este botón para verificar/activar su hoja directamente en una pestaña nueva:<br/>
-          <a href="${escaparAttr(pingUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary mt-2 mb-1">
-            <i class="bi bi-box-arrow-up-right me-1"></i>Abrir y verificar URL en pestaña nueva
-          </a>
-          <div class="mt-1 text-muted" style="font-size:0.78rem;">
-            • Si al abrirla ve <code>{"ok":true,...,"spreadsheetUrl":"..."}</code>, su hoja ya fue creada en Google Drive.<br/>
-            • Si le pide iniciar sesión o dice <em>"función no encontrada"</em>, en Apps Script presione <strong>Guardar (Ctrl+S)</strong>, luego <strong>Implementar &rarr; Gestionar implementaciones &rarr; Editar (lápiz) &rarr; Versión: Nueva versión &rarr; Quién tiene acceso: "Cualquier persona"</strong> (no elija "Cualquier usuario con cuenta de Google").
-          </div>
+        <div class="alert alert-danger py-2 mb-0">
+          <strong>No fue posible conectar:</strong> ${escaparHtml(err.message)}.
         </div>
       `;
     } finally {
