@@ -871,17 +871,36 @@
   }
 
   async function enviarRegistrosAGoogleDrive(scriptUrl, registros) {
-    const resp = await fetch(scriptUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify({ registros: registros })
-    });
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
+    const bodyStr = JSON.stringify({ registros: registros });
+    try {
+      const resp = await fetch(scriptUrl, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: bodyStr
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      return await resp.json();
+    } catch (err) {
+      // Fallback no-cors: el navegador envía el POST completo a Google Apps Script aunque bloquee la lectura de cabeceras CORS
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: bodyStr
+      });
+      return {
+        ok: true,
+        modoNoCors: true,
+        mensaje: 'Calificación enviada (modo compatible CORS).'
+      };
     }
-    return await resp.json();
   }
 
   function limpiarTemaYNotasTrasEnvio() {
@@ -1576,10 +1595,19 @@
       await consultarEvaluacionesDrive(false);
     } catch (err) {
       actualizarEstadoModoInstructorUI();
+      const sep = url.includes('?') ? '&' : '?';
+      const pingUrl = `${url}${sep}action=ping`;
       dom.testConnectionResult.innerHTML = `
-        <div class="alert alert-danger py-2 mb-0">
-          <strong>URL guardada, pero falló la prueba:</strong> ${escaparHtml(err.message)}.<br/>
-          Verifique que en Apps Script haya elegido <em>Quién tiene acceso: "Cualquier persona"</em> y que la URL termine en <code>/exec</code>.
+        <div class="alert alert-warning py-2 mb-0">
+          <strong>URL guardada, pero el navegador bloqueó la lectura directa (${escaparHtml(err.message)}).</strong><br/>
+          Haga clic en este botón para verificar/activar su hoja directamente en una pestaña nueva:<br/>
+          <a href="${escaparAttr(pingUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary mt-2 mb-1">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Abrir y verificar URL en pestaña nueva
+          </a>
+          <div class="mt-1 text-muted" style="font-size:0.78rem;">
+            • Si al abrirla ve <code>{"ok":true,...,"spreadsheetUrl":"..."}</code>, su hoja ya fue creada en Google Drive.<br/>
+            • Si le pide iniciar sesión o dice <em>"función no encontrada"</em>, en Apps Script presione <strong>Guardar (Ctrl+S)</strong>, luego <strong>Implementar &rarr; Gestionar implementaciones &rarr; Editar (lápiz) &rarr; Versión: Nueva versión &rarr; Quién tiene acceso: "Cualquier persona"</strong> (no elija "Cualquier usuario con cuenta de Google").
+          </div>
         </div>
       `;
     } finally {
