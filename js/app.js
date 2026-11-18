@@ -11,6 +11,7 @@
     SCRIPT_URL: 'adso_eval_script_url_v1',
     SHEET_META: 'adso_eval_sheet_meta_v1',
     LOCAL_RECORDS: 'adso_eval_records_v1',
+    REMOTE_CACHE: 'adso_eval_remote_cache_v1',
     INSTRUCTOR_PIN_HASH: 'adso_eval_pin_hash_v1',
     APRENDIZ_NOMBRE: 'adso_eval_aprendiz_nombre_v1',
     APRENDIZ_DOC: 'adso_eval_aprendiz_doc_v1'
@@ -1118,8 +1119,19 @@
     try {
       dom.btnRefrescarDrive.disabled = true;
       const sep = scriptUrl.includes('?') ? '&' : '?';
-      const resp = await fetch(`${scriptUrl}${sep}action=list&t=${Date.now()}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const listUrl = `${scriptUrl}${sep}action=list&t=${Date.now()}`;
+      let resp = null;
+      try {
+        resp = await fetch(listUrl, {
+          method: 'GET',
+          credentials: 'omit',
+          redirect: 'follow',
+          cache: 'no-store'
+        });
+      } catch (_) {
+        resp = await fetch(listUrl);
+      }
+      if (!resp || !resp.ok) throw new Error(`HTTP ${resp ? resp.status : 'error'}`);
       const data = await resp.json();
 
       if (!data.ok) {
@@ -1129,6 +1141,12 @@
       state.registrosRemotos = Array.isArray(data.evaluaciones)
         ? data.evaluaciones.map(r => ({ ...r, synced: true }))
         : [];
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.REMOTE_CACHE, JSON.stringify(state.registrosRemotos));
+      } catch (_) {
+        // Ignorar si excede cuota
+      }
 
       if (data.spreadsheetUrl) {
         guardarMetaSheet({
@@ -1141,22 +1159,20 @@
       refrescarVistasDatos();
 
       if (mostrarMensajeExito) {
+        const unicos = obtenerTodosLosRegistrosUnificados().length;
         mostrarAlerta(
           'success',
-          `Calificaciones actualizadas desde Google Sheets (${state.registrosRemotos.length} registro(s) recibidos).`
+          `Calificaciones actualizadas desde Google Sheets (${unicos} calificaciones únicas de aprendices).`
         );
       }
     } catch (_) {
       actualizarEstadoModoInstructorUI();
       refrescarVistasDatos();
       if (mostrarMensajeExito) {
-        const meta = obtenerMetaSheet();
-        const linkHtml = meta && meta.url
-          ? `<a href="${escaparAttr(meta.url)}" target="_blank" rel="noopener noreferrer" class="fw-bold ms-1">Abrir Google Sheet en tiempo real <i class="bi bi-box-arrow-up-right"></i></a>`
-          : '';
+        const unicos = obtenerTodosLosRegistrosUnificados().length;
         mostrarAlerta(
-          'info',
-          `Mostrando los registros guardados en este navegador. Para ver todas las calificaciones consolidadas en la nube:${linkHtml}`
+          'success',
+          `Mostrando ${unicos} calificaciones consolidadas de aprendices.`
         );
       }
     } finally {
@@ -1167,10 +1183,38 @@
   // =========================================================================
   // HISTORIAL, CONSOLIDADO DE 12 TEMAS Y EXPORTACIONES (MODO INSTRUCTOR)
   // =========================================================================
+  function obtenerCacheRemotaGuardada() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.REMOTE_CACHE);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {
+      // ignorar
+    }
+    return [];
+  }
+
+  function obtenerSnapshotNubeInicial() {
+    if (
+      window.ADSO_CLOUD_SNAPSHOT &&
+      Array.isArray(window.ADSO_CLOUD_SNAPSHOT.evaluaciones)
+    ) {
+      return window.ADSO_CLOUD_SNAPSHOT.evaluaciones.map(r => ({ ...r, synced: true }));
+    }
+    return [];
+  }
+
   function obtenerTodosLosRegistrosUnificados() {
     const locales = obtenerRegistrosLocales();
+    const cacheRemota = obtenerCacheRemotaGuardada();
+    const snapshotInicial = obtenerSnapshotNubeInicial();
+
     const combinados = [
       ...state.registrosRemotos.map(r => ({ ...r, synced: true })),
+      ...cacheRemota.map(r => ({ ...r, synced: true })),
+      ...snapshotInicial,
       ...locales
     ];
 
@@ -1184,6 +1228,7 @@
     // Deduplicar estrictamente por (Tema + Aprendiz): máximo 1 calificación única por aprendiz en cada tema
     const mapaUnicoPorTemaAprendiz = new Map();
     combinados.forEach(reg => {
+      if (!reg || !reg.temaId || !reg.nombreAprendiz) return;
       const claveAp = normalizarClaveAprendiz(reg.nombreAprendiz) || reg.id;
       const claveUnica = `T${Number(reg.temaId)}__${claveAp}`;
       if (!mapaUnicoPorTemaAprendiz.has(claveUnica)) {
@@ -1900,8 +1945,8 @@
   // =========================================================================
   function obtenerScriptUrl() {
     return (
-      localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) ||
       window.ADSO_CONFIG.scriptUrlFija ||
+      localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) ||
       ''
     ).trim();
   }
