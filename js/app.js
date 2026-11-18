@@ -207,6 +207,34 @@
       opt2.textContent = `Tema ${tema.id}: ${tema.titulo}`;
       dom.filtroTema.appendChild(opt2);
     });
+
+    // Poblar lista desplegable con los 21 aprendices de la Ficha 3232460
+    const datalist = document.getElementById('datalistAprendicesFicha');
+    if (datalist && Array.isArray(window.ADSO_CONFIG.aprendicesFicha)) {
+      datalist.innerHTML = window.ADSO_CONFIG.aprendicesFicha
+        .map(nombre => `<option value="${escaparAttr(nombre)}"></option>`)
+        .join('');
+    }
+  }
+
+  function normalizarClaveAprendiz(nombre) {
+    const limpio = String(nombre ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .trim();
+    if (!limpio) return '';
+    const tokens = limpio.split(/\s+/);
+    // Primeras 3 palabras unifican ej. "Juan Jose Taita" y "Juan Jose Taita Avellaneda" sin colisionar entre los 21 aprendices
+    return tokens.slice(0, 3).join(' ');
+  }
+
+  function obtenerNombreOficialAprendiz(nombre) {
+    const clave = normalizarClaveAprendiz(nombre);
+    const lista = window.ADSO_CONFIG.aprendicesFicha || [];
+    const encontrado = lista.find(oficial => normalizarClaveAprendiz(oficial) === clave);
+    return encontrado || String(nombre ?? '').trim();
   }
 
   function renderizarCodigoAppsScript() {
@@ -743,22 +771,25 @@
       if (!confirmarIncompleto) return;
     }
 
-    // Evitar doble envío accidental del mismo tema por el mismo aprendiz en este navegador
-    const previosLocales = obtenerRegistrosLocales();
-    const yaCalificoEsteTema = previosLocales.some(
+    // Evitar doble envío del mismo tema por el mismo aprendiz (1 única calificación por aprendiz y tema)
+    const claveEvaluador = normalizarClaveAprendiz(nombreAprendiz);
+    const nombreEstandarizado = obtenerNombreOficialAprendiz(nombreAprendiz);
+    const todosExistentes = obtenerTodosLosRegistrosUnificados();
+    const yaCalificoEsteTema = todosExistentes.some(
       r =>
         Number(r.temaId) === state.temaActual.id &&
-        (r.nombreAprendiz || '').trim().toLowerCase() === nombreAprendiz.toLowerCase()
+        normalizarClaveAprendiz(r.nombreAprendiz) === claveEvaluador
     );
     if (yaCalificoEsteTema) {
-      const confirmarDuplicado = window.confirm(
-        `Ya registraste una calificación previa para el Tema ${state.temaActual.id} con el nombre "${nombreAprendiz}".\n\n¿Deseas enviar una nueva calificación adicional?`
+      mostrarAlerta(
+        'warning',
+        `<strong>${escaparHtml(nombreEstandarizado)}</strong>: ya registraste tu calificación para el <strong>Tema ${state.temaActual.id} (${escaparHtml(state.temaActual.titulo)})</strong>. Solo se permite 1 calificación por aprendiz en cada tema.`
       );
-      if (!confirmarDuplicado) return;
+      return;
     }
 
     // Recordar nombre y documento del aprendiz en su navegador para las siguientes exposiciones
-    localStorage.setItem(STORAGE_KEYS.APRENDIZ_NOMBRE, nombreAprendiz);
+    localStorage.setItem(STORAGE_KEYS.APRENDIZ_NOMBRE, nombreEstandarizado);
     localStorage.setItem(STORAGE_KEYS.APRENDIZ_DOC, documentoAprendiz);
 
     const ficha = window.ADSO_CONFIG.fichaDefault || '3232460';
@@ -784,16 +815,18 @@
         ? `${formatearSegundos(state.timer.segundosTotalesUsados)} / ${state.timer.modoMinutos}:00`
         : `Estándar (${state.timer.modoMinutos} min)`;
 
+    const idDeterministico = `EVAL-T${state.temaActual.id}-${claveEvaluador.replace(/\s+/g, '_')}`;
+
     const registro = {
-      id: `EVAL-${Date.now()}-${generarIdCorto()}`,
+      id: idDeterministico,
       grupoId: `TEMA-${state.temaActual.id}`,
       fechaRegistro: new Date().toISOString(),
       fechaExposicion: dom.inputFechaExposicion.value,
       ficha: ficha,
       modalidadRegistro: 'Coevaluación Aprendiz',
-      nombreAprendiz: nombreAprendiz,
+      nombreAprendiz: nombreEstandarizado,
       documentoAprendiz: documentoAprendiz,
-      integrantesGrupo: nombreAprendiz,
+      integrantesGrupo: nombreEstandarizado,
       temaId: state.temaActual.id,
       temaTitulo: state.temaActual.titulo,
       tecnologia: `${state.temaActual.categoria} · ${state.temaActual.tecnologia}`,
@@ -1136,23 +1169,32 @@
   // =========================================================================
   function obtenerTodosLosRegistrosUnificados() {
     const locales = obtenerRegistrosLocales();
-    const mapa = new Map();
+    const combinados = [
+      ...state.registrosRemotos.map(r => ({ ...r, synced: true })),
+      ...locales
+    ];
 
-    state.registrosRemotos.forEach(r => {
-      mapa.set(r.id, { ...r, synced: true });
-    });
-
-    locales.forEach(loc => {
-      if (!mapa.has(loc.id)) {
-        mapa.set(loc.id, loc);
-      }
-    });
-
-    return Array.from(mapa.values()).sort((a, b) => {
+    // Ordenar del más reciente al más antiguo
+    combinados.sort((a, b) => {
       const fa = a.fechaRegistro || a.fechaExposicion || '';
       const fb = b.fechaRegistro || b.fechaExposicion || '';
       return fb.localeCompare(fa);
     });
+
+    // Deduplicar estrictamente por (Tema + Aprendiz): máximo 1 calificación única por aprendiz en cada tema
+    const mapaUnicoPorTemaAprendiz = new Map();
+    combinados.forEach(reg => {
+      const claveAp = normalizarClaveAprendiz(reg.nombreAprendiz) || reg.id;
+      const claveUnica = `T${Number(reg.temaId)}__${claveAp}`;
+      if (!mapaUnicoPorTemaAprendiz.has(claveUnica)) {
+        mapaUnicoPorTemaAprendiz.set(claveUnica, {
+          ...reg,
+          nombreAprendiz: obtenerNombreOficialAprendiz(reg.nombreAprendiz)
+        });
+      }
+    });
+
+    return Array.from(mapaUnicoPorTemaAprendiz.values());
   }
 
   function refrescarVistasDatos() {
@@ -1249,9 +1291,14 @@
   }
 
   function renderizarPlanillaControl12Temas(todos) {
+    const totalEsperado = window.ADSO_CONFIG.totalAprendicesFicha || 21;
+    const listaOficial = window.ADSO_CONFIG.aprendicesFicha || [];
+
     dom.tablaPlanillaBody.innerHTML = window.TEMARIO_ADSO.map(tema => {
       const evalsTema = todos.filter(r => Number(r.temaId) === tema.id);
       const evaluadoresUnicos = Array.from(new Set(evalsTema.map(e => e.nombreAprendiz).filter(Boolean)));
+      const clavesQueCalificaron = new Set(evaluadoresUnicos.map(n => normalizarClaveAprendiz(n)));
+      const faltantes = listaOficial.filter(oficial => !clavesQueCalificaron.has(normalizarClaveAprendiz(oficial)));
 
       let notaTexto = '<span class="text-muted">—</span>';
       let juicioBadge = '<span class="badge bg-light text-secondary border">Pendiente</span>';
@@ -1268,13 +1315,27 @@
           : '<span class="badge bg-danger">NO APROBADO (D)</span>';
       }
 
+      const completo = evalsTema.length >= totalEsperado;
+      const badgeCountClass = completo
+        ? 'bg-success'
+        : evalsTema.length > 0
+        ? 'bg-primary'
+        : 'bg-secondary';
+
+      const htmlFaltantes =
+        evalsTema.length > 0 && faltantes.length > 0
+          ? `<div class="mt-1 small text-danger"><i class="bi bi-exclamation-circle me-1"></i><strong>Faltan por calificar (${faltantes.length}):</strong> ${escaparHtml(faltantes.join(', '))}</div>`
+          : '';
+
       return `
         <tr>
           <td class="text-center fw-bold">${tema.id}</td>
           <td class="fw-semibold">${escaparHtml(tema.titulo)}</td>
           <td class="text-muted">${escaparHtml(tema.sesion)}</td>
-          <td class="text-center"><span class="badge bg-secondary">${evalsTema.length}</span></td>
-          <td>${evaluadoresUnicos.length > 0 ? escaparHtml(evaluadoresUnicos.join(', ')) : '<span class="text-muted fst-italic">Sin calificaciones aún</span>'}</td>
+          <td class="text-center"><span class="badge ${badgeCountClass}">${evalsTema.length} / ${totalEsperado}</span></td>
+          <td>
+            ${evaluadoresUnicos.length > 0 ? `<div>${escaparHtml(evaluadoresUnicos.join(', '))}</div>${htmlFaltantes}` : '<span class="text-muted fst-italic">Sin calificaciones aún</span>'}
+          </td>
           <td class="text-center">${notaTexto}</td>
           <td class="text-center">${juicioBadge}</td>
         </tr>
